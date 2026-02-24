@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import numpy as np
 from state.memory import candles
@@ -40,3 +42,9 @@ class IndicatorsCalculator:
             cls._logger.exception(f"Exception {exception} while calculating indicator with type {ind_type}")
             
         return values
+
+def clean(values):
+    return [
+        None if (v is None or not math.isfinite(v)) else float(v)
+        for v in values
+    ]

@@ -3,12 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import time
 import asyncio
-from core.db import Base, get_engine
-from services.candles import fetch_candles
 from core.settings import get_app_name, get_environment, get_debug
 from core.logging import setup_logging, get_logger
 from services.candles import candle_loop
-from api.indicator_routes import router 
+# from api.indicator_routes import router as indicator_router
+from api.symbol_routes import router as symbol_router
 
 setup_logging()
 
@@ -20,10 +19,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {get_app_name()}")
     logger.info(f"Environment: {get_environment()}")
     logger.info(f"Debug mode: {get_debug()}")
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info(f"Successfully create database")
 
     asyncio.create_task(candle_loop())
     logger.info(f"Candle loop started")
@@ -45,7 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+
+# app.include_router(indicator_router)
+app.include_router(symbol_router)
 
 
 @app.middleware("http")

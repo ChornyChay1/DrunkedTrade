@@ -5,7 +5,7 @@ import pandas as pd
 from core.logging import get_logger
 from core.settings import get_bybit_url
 from state.memory import candles
-from services.indicators import recalc_all_indicators
+# from services.indicators import recalc_all_indicators
 
 _logger = get_logger("CandlesService")
 
@@ -34,7 +34,7 @@ async def fetch_candles():
     candles.extend(df.to_dict(orient="records"))
 
     _logger.debug(f"Finish catch candles, catched {len(df)} candles")
-    await recalc_all_indicators()
+# await recalc_all_indicators()
 
 async def candle_loop():
     while True:
