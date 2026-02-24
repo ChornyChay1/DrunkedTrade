@@ -2,6 +2,7 @@
 ML baseline: Random Walk and Ridge/Linear Regression on lags.
 Target: next-period return r_{t+1} = (close_{t+1} - close_t) / close_t.
 """
+import json
 from pathlib import Path
 
 import numpy as np
@@ -178,15 +179,25 @@ def main():
     print(f"  LinearRegression:  {lr_pred.min():.6f}, {lr_pred.max():.6f}, {lr_pred.mean():.6f}, {lr_pred.std():.6f}")
     print(f"  LR intercept={lr.intercept_:.6f}, coef norm={np.linalg.norm(lr.coef_):.6f}")
 
-    # Save trained model and scaler
+    # Пороги для меток 1/-1/0: 90-й перцентиль положительных и отрицательных доходностей
+    pos_returns = y_train_arr[y_train_arr > 0]
+    neg_returns = y_train_arr[y_train_arr < 0]
+    threshold_buy = float(np.percentile(pos_returns, 90)) if len(pos_returns) > 0 else np.inf
+    threshold_sell = float(np.percentile(neg_returns, 90)) if len(neg_returns) > 0 else -np.inf  # 90% отрицательных ниже этого
+    percentiles = {"threshold_buy": threshold_buy, "threshold_sell": threshold_sell}
+
+    # Save trained model, scaler and percentiles
     models_dir = SCRIPT_DIR / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     lr_path = models_dir / "linear_regression.joblib"
     scaler_path = models_dir / "scaler.joblib"
     dump(lr, lr_path)
     dump(scaler, scaler_path)
+    with open(models_dir / "percentiles.json", "w", encoding="utf-8") as f:
+        json.dump(percentiles, f, indent=2)
     print(f"LinearRegression model saved to {lr_path}")
     print(f"Scaler saved to {scaler_path}")
+    print(f"Percentiles saved to {models_dir / 'percentiles.json'} (threshold_buy={threshold_buy:.6f}, threshold_sell={threshold_sell:.6f})")
 
     # Console output
     print("ML baseline metrics (test set, target = next-period return)")
