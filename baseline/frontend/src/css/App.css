@@ -261,8 +261,8 @@ body {
     transition: var(--transition-base);
     height: fit-content;
     border: 1px solid var(--gray-200);
-    max-height: calc(100vh - 110px);
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .indicators-panel:hover {
