@@ -9,19 +9,18 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from features import build_feature_row, MIN_CANDLES
-from schema import Candle, GetPredict
+from schema import GetPredict, PredictRequest
 
 logger = logging.getLogger("ML-Service")
 
 # Путь к артефактам обучения (experiments/models)
 MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "experiments" / "models"
 
-# Глобальное состояние: модель, скейлер, пороги, буфер цен
+# Глобальное состояние: модель, скейлер, пороги
 model = None
 scaler = None
 threshold_buy = None
 threshold_sell = None
-candle_buffer: list[float] = []
 
 
 def prediction_to_label(pred: float) -> int:
@@ -118,18 +117,20 @@ async def health_check():
     return {"status": "healthy"}
 
 @app.post("/predict", response_model=GetPredict)
-async def predict(candle: Candle):
-    global candle_buffer
+async def predict(req: PredictRequest):
     if model is None or scaler is None:
         return GetPredict(prediction=0)
 
-    candle_buffer.append(float(candle.close))
-    print(f"{candle_buffer=}")
-    # Храним только последние свечи, чтобы хватало для признаков
-    if len(candle_buffer) > MIN_CANDLES * 2:
-        candle_buffer = candle_buffer[-MIN_CANDLES * 2 :]
+    if len(req.candles) < MIN_CANDLES:
+        logger.warning(
+            "predict: received %d candles, need at least %d for feature calculation",
+            len(req.candles),
+            MIN_CANDLES,
+        )
+        return GetPredict(prediction=0)
 
-    X = build_feature_row(candle_buffer)
+    closes = [float(c.close) for c in req.candles]
+    X = build_feature_row(closes)
     if X is None:
         return GetPredict(prediction=0)
 
