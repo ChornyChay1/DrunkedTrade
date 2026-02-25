@@ -1,5 +1,7 @@
+import os
 import json
 import logging
+from threading import local
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,14 +15,14 @@ from schema import GetPredict, PredictRequest
 
 logger = logging.getLogger("ML-Service")
 
-# Путь к артефактам обучения (experiments/models)
-MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "experiments" / "models"
-
-# Глобальное состояние: модель, скейлер, пороги
 model = None
 scaler = None
 threshold_buy = None
 threshold_sell = None
+
+
+def get_model_dir(local_path:str = "experiments/models") -> str:
+    return os.path.join(Path(__file__).resolve().parent.parent.parent, local_path)
 
 
 def prediction_to_label(pred: float) -> int:
@@ -40,9 +42,10 @@ async def lifespan(app: FastAPI):
     global model, scaler, threshold_buy, threshold_sell
     logger.info("Starting ML-Service")
     try:
-        model = joblib.load(MODELS_DIR / "linear_regression.joblib")
-        scaler = joblib.load(MODELS_DIR / "scaler.joblib")
-        percentiles_path = MODELS_DIR / "percentiles.json"
+        model_dir = get_model_dir()
+        model = joblib.load(model_dir + "/linear_regression.joblib")
+        scaler = joblib.load(model_dir + "/scaler.joblib")
+        percentiles_path = Path(model_dir + "/percentiles.json")
         if percentiles_path.exists():
             with open(percentiles_path, encoding="utf-8") as f:
                 p = json.load(f)
