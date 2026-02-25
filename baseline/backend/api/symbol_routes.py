@@ -11,6 +11,21 @@ import asyncio
 router = APIRouter(prefix="/symbol", tags=["symbol"])
 
 PREDICT_URL = "http://localhost:8001/predict"
+# Должно совпадать с MIN_CANDLES в ml_service/features.py (признаки требуют 61 свечу)
+MIN_CANDLES_FOR_PREDICT = 61
+
+
+def _candle_to_predict_item(c: dict) -> dict:
+    """Приводит свечу из state к формату Candle для PredictRequest (поле start вместо timestamp)."""
+    return {
+        "start": c["timestamp"],
+        "open": c["open"],
+        "high": c["high"],
+        "low": c["low"],
+        "close": c["close"],
+        "volume": c["volume"],
+        "turnover": c["turnover"],
+    }
 
 
 @router.get("/data")
@@ -31,29 +46,24 @@ async def get_data(
             values = IndicatorsCalculator.calculate(ind.type, close_series, ind.period)
             dynamic_values[ind.id] = clean(values)
 
-    # --- функция запроса predict ---
-    async def fetch_action(client, candle):
+    # --- предсказания: PredictRequest ожидает список свечей (от старых к новым), предсказание для последней ---
+    async def fetch_action(client, end_index: int):
+        if end_index < MIN_CANDLES_FOR_PREDICT - 1:
+            return 0
         payload = {
-            "start": candle["timestamp"],
-            "open": candle["open"],
-            "high": candle["high"],
-            "low": candle["low"],
-            "close": candle["close"],
-            "volume": candle["volume"],
-            "turnover": candle["turnover"],
+            "candles": [_candle_to_predict_item(c) for c in candles[: end_index + 1]],
         }
         try:
             resp = await client.post(PREDICT_URL, json=payload, timeout=5)
             resp.raise_for_status()
             data = resp.json()
-            return data.get("prediction")
+            return data.get("prediction", 0)
         except Exception:
             return None
 
-    # --- параллельные запросы ---
     async with httpx.AsyncClient() as client:
         actions = await asyncio.gather(
-            *[fetch_action(client, c) for c in candles]
+            *[fetch_action(client, i) for i in range(len(candles))]
         )
 
     # --- объединение и аналитика ---
@@ -70,7 +80,7 @@ async def get_data(
             for ind_id in dynamic_values
             if i < len(dynamic_values[ind_id])
         }
-        action = actions[i]
+        action = actions[i] if actions[i] is not None else 0
         row["action"] = action
 
         if action == 1:
