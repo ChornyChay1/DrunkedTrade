@@ -16,7 +16,7 @@ async def fetch_candles():
         "category": "linear",
         "symbol": "BTCUSDT",
         "interval": "1",
-        "limit": 100
+        "limit": 400
     }
 
     async with httpx.AsyncClient() as client:

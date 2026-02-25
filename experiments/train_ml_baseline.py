@@ -182,8 +182,8 @@ def main():
     # Пороги для меток 1/-1/0: 90-й перцентиль положительных и отрицательных доходностей
     pos_returns = y_train_arr[y_train_arr > 0]
     neg_returns = y_train_arr[y_train_arr < 0]
-    threshold_buy = float(np.percentile(pos_returns, 70)) if len(pos_returns) > 0 else np.inf
-    threshold_sell = float(np.percentile(neg_returns, 70)) if len(neg_returns) > 0 else -np.inf  # 70% отрицательных ниже этого
+    threshold_buy = float(np.percentile(pos_returns, 10)) if len(pos_returns) > 0 else np.inf
+    threshold_sell = float(np.percentile(neg_returns, 10)) if len(neg_returns) > 0 else -np.inf  # 70% отрицательных ниже этого
     percentiles = {"threshold_buy": threshold_buy, "threshold_sell": threshold_sell}
 
     # Save trained model, scaler and percentiles
