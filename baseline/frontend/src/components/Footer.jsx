@@ -5,7 +5,7 @@ function Footer() {
     return (
         <footer className="footer">
             <div>CryptoExplorer © 2026</div>
-            <div>Данные обновляются каждые 5 секунд</div>
+            <div>Данные обновляются каждую минуту</div>
         </footer>
     );
 }

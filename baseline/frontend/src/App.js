@@ -5,31 +5,46 @@ import Footer from './components/Footer';
 import Chart from './components/Chart';
 import IndicatorPanel from './components/IndicatorPanel';
 import './css/App.css';
+import AnalyticsPanel from "./components/AnalyticsPanel";
+
+const API_URL = 'http://localhost:8000/symbol/data';
 
 function App() {
   const [candles, setCandles] = useState([]);
   const [indicators, setIndicators] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [indicators]); // перезапрашиваем если изменились индикаторы
+
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/data');
+
+      let url = API_URL;
+
+      if (indicators.length > 0) {
+        const query = encodeURIComponent(JSON.stringify(indicators));
+        url += `?indicators=${query}`;
+      }
+
+      const response = await fetch(url);
       const data = await response.json();
 
-      const candlesWithTime = data.candles.map((c, i) => ({
+      // используем start от Bybit
+      const candlesWithTime = data.candles.map(c => ({
         ...c,
-        time: Math.floor(Date.now() / 1000) - (data.candles.length - i) * 60
+        time: Math.floor(c.start / 1000)
       }));
 
       setCandles(candlesWithTime);
-      setIndicators(data.indicators);
+      setAnalytics(data.analytics)
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -37,110 +52,83 @@ function App() {
     }
   };
 
-  const handleAddIndicator = async (indicator) => {
-    try {
-      const response = await fetch('http://localhost:8000/indicator', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(indicator)
-      });
 
-      if (response.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error creating indicator:', error);
-    }
+  // --- локальное добавление ---
+  const handleAddIndicator = (indicator) => {
+    const newIndicator = {
+      ...indicator,
+      id: crypto.randomUUID()
+    };
+
+    setIndicators(prev => [...prev, newIndicator]);
   };
 
-  const handleDeleteIndicator = async (id) => {
-    try {
-      const response = await fetch(`http://localhost:8000/indicator/${id}`, {
-        method: 'DELETE'
-      });
 
-      if (response.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error('Error deleting indicator:', error);
-    }
+  // --- локальное удаление ---
+  const handleDeleteIndicator = (id) => {
+    setIndicators(prev =>
+        prev.filter(ind => ind.id !== id)
+    );
   };
 
-  const handleUpdateColor = async (id, color) => {
-    try {
-      const indicator = indicators.find(ind => ind.id === id);
-      if (!indicator) return;
 
-      const response = await fetch(`http://localhost:8000/indicator/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: indicator.name,
-          type: indicator.type,
-          period: indicator.period,
-          color: color
-        })
-      });
-
-      if (response.ok) {
-        setIndicators(prev =>
-            prev.map(ind =>
-                ind.id === id ? { ...ind, color } : ind
-            )
-        );
-      }
-    } catch (error) {
-      console.error('Error updating color:', error);
-    }
+  // --- изменение цвета ---
+  const handleUpdateColor = (id, color) => {
+    setIndicators(prev =>
+        prev.map(ind =>
+            ind.id === id ? { ...ind, color } : ind
+        )
+    );
   };
 
-  const handleUpdateIndicator = async (id, updatedData) => {
-    try {
-      const response = await fetch(`http://localhost:8000/indicator/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
-      });
 
-      if (response.ok) {
-        setIndicators(prev =>
-            prev.map(ind =>
-                ind.id === id ? { ...ind, ...updatedData } : ind
-            )
-        );
-      }
-      fetchData()
-    } catch (error) {
-      console.error('Error updating indicator:', error);
-    }
+  // --- изменение параметров ---
+  const handleUpdateIndicator = (id, updatedData) => {
+    setIndicators(prev =>
+        prev.map(ind =>
+            ind.id === id ? { ...ind, ...updatedData } : ind
+        )
+    );
   };
+
 
   const getCurrentPrice = () => {
     if (candles.length === 0) return null;
     return candles[candles.length - 1].close;
   };
 
+
   return (
       <div className="app">
+
         <Header currentPrice={getCurrentPrice()} />
 
         <main className="main">
-          <div className="chart-container">
+
+          <div className="chart-view">
             {loading && <div className="loading">Загрузка...</div>}
-            <Chart candles={candles} indicators={indicators} />
+
+            <Chart
+                candles={candles}
+                indicators={indicators}
+            />
           </div>
 
-          <IndicatorPanel
-              indicators={indicators}
-              onAdd={handleAddIndicator}
-              onDelete={handleDeleteIndicator}
-              onUpdateColor={handleUpdateColor}
-              onUpdateIndicator={handleUpdateIndicator}
-          />
+          <div className="sidebar">
+
+            <IndicatorPanel
+                indicators={indicators}
+                onAdd={handleAddIndicator}
+                onDelete={handleDeleteIndicator}
+                onUpdateColor={handleUpdateColor}
+                onUpdateIndicator={handleUpdateIndicator}
+            />
+            <AnalyticsPanel analytics={analytics} />
+          </div>
         </main>
 
         <Footer />
+
       </div>
   );
 }

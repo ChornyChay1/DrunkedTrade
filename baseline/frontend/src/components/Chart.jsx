@@ -1,14 +1,19 @@
 // src/components/Chart.jsx
-import React, { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart, CandlestickSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
+import '../css/App.css';
 
 function Chart({ candles, indicators }) {
     const mainChartRef = useRef();
     const mainChartInstance = useRef();
     const subChartInstance = useRef();
     const mainSeriesRef = useRef();
+    const markersApiRef = useRef(); // API для управления маркерами
     const indicatorSeriesRef = useRef({});
     const subIndicatorSeriesRef = useRef({});
+
+    // Состояние для легенды с действиями
+    const [actionLegend, setActionLegend] = useState([]);
 
     // Сохраняем состояние масштаба
     const timeScaleStateRef = useRef(null);
@@ -94,7 +99,91 @@ function Chart({ candles, indicators }) {
         };
     }, []);
 
-    // Обновление свечей с сохранением масштаба
+    // Функция для форматирования даты
+    const formatDate = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    // Функция для создания маркеров на основе action (только стрелочки)
+    const createActionMarkers = (candles) => {
+        return candles
+            .filter(c => c.action === 1 || c.action === -1) // Оставляем только свечи с действиями
+            .map(c => {
+                const time = Math.floor(c.timestamp / 1000);
+
+                if (c.action === 1) {
+                    // Зеленая стрелка вверх - покупка (только стрелка, без текста)
+                    return {
+                        time: time,
+                        position: 'belowBar', // Стрелка под свечой для покупки
+                        color: '#00c853', // Зеленый цвет
+                        shape: 'arrowUp',
+                        text: '', // Убираем текст, оставляем только стрелку
+                    };
+                } else if (c.action === -1) {
+                    // Красная стрелка вниз - продажа (только стрелка, без текста)
+                    return {
+                        time: time,
+                        position: 'aboveBar', // Стрелка над свечой для продажи
+                        color: '#ff3d00', // Красный цвет
+                        shape: 'arrowDown',
+                        text: '', // Убираем текст, оставляем только стрелку
+                    };
+                }
+                return null;
+            })
+            .filter(marker => marker !== null);
+    };
+
+    // Обновление легенды с действиями
+    useEffect(() => {
+        if (!candles.length) return;
+
+        // Создаем легенду для отображения действий
+        const actions = candles
+            .filter(c => c.action === 1 || c.action === -1)
+            .slice(-10) // Показываем последние 10 действий
+            .reverse() // Сначала новые
+            .map(c => ({
+                time: formatDate(c.timestamp),
+                type: c.action === 1 ? 'BUY' : 'SELL',
+                price: c.close,
+                color: c.action === 1 ? '#00c853' : '#ff3d00'
+            }));
+
+        setActionLegend(actions);
+    }, [candles]);
+
+    // Инициализация маркеров при первой загрузке или при создании серии
+    useEffect(() => {
+        if (!mainSeriesRef.current) return;
+
+        // Создаем API для маркеров с опциями
+        markersApiRef.current = createSeriesMarkers(
+            mainSeriesRef.current,
+            [], // Начинаем с пустого массива
+            {
+                autoScale: true, // Маркеры учитываются при автоскейлинге
+                zOrder: 'normal' // Нормальный порядок отрисовки
+            }
+        );
+
+        return () => {
+            // Очищаем маркеры при размонтировании
+            if (markersApiRef.current) {
+                markersApiRef.current.setMarkers([]);
+            }
+        };
+    }, []); // Зависимость пустая, так как mainSeriesRef.current стабилен
+
+    // Обновление свечей с сохранением масштаба и добавлением маркеров
     useEffect(() => {
         if (!candles.length || !mainSeriesRef.current || !mainChartInstance.current) return;
 
@@ -112,6 +201,24 @@ function Chart({ candles, indicators }) {
 
         // Обновляем данные
         mainSeriesRef.current.setData(chartData);
+
+        // Обновляем маркеры, используя API
+        const markers = createActionMarkers(candles);
+
+        if (markersApiRef.current) {
+            // Используем setMarkers для полной замены маркеров
+            markersApiRef.current.setMarkers(markers);
+        } else {
+            // Если API еще не создан, создаем его
+            markersApiRef.current = createSeriesMarkers(
+                mainSeriesRef.current,
+                markers,
+                {
+                    autoScale: true,
+                    zOrder: 'normal'
+                }
+            );
+        }
 
         // Восстанавливаем масштаб после обновления данных
         if (currentLogicalRange) {
@@ -239,7 +346,32 @@ function Chart({ candles, indicators }) {
 
     return (
         <div className="chart-wrapper">
-            <div ref={mainChartRef} className="main-chart" />
+            <div className="chart-container">
+                <div ref={mainChartRef} className="main-chart" />
+
+                {/* Легенда для отображения действий */}
+                {actionLegend.length > 0 && (
+                    <div className="action-legend">
+                        <h4>Последние действия</h4>
+                        <div className="legend-items">
+                            {actionLegend.map((action, index) => (
+                                <div key={index} className="legend-item">
+                                    <span className="legend-time">{action.time}</span>
+                                    <span
+                                        className="legend-type"
+                                        style={{ color: action.color, fontWeight: 'bold' }}
+                                    >
+                                        {action.type}
+                                    </span>
+                                    <span className="legend-price">
+                                        {action.price.toFixed(2)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
