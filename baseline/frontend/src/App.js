@@ -18,7 +18,7 @@ function App() {
   useEffect(() => {
     fetchData();
 
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 180000);
     return () => clearInterval(interval);
   }, [indicators]); // перезапрашиваем если изменились индикаторы
 

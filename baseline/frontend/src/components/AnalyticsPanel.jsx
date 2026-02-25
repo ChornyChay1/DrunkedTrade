@@ -6,11 +6,16 @@ function AnalyticsPanel({ analytics }) {
     if (!analytics) return null;
 
     const rows = [
-        { label: 'Всего покупок', value: analytics.total_buy },
-        { label: 'Всего продаж', value: analytics.total_sell },
-        { label: 'Средняя цена покупки', value: analytics.avg_buy.toFixed(2) },
-        { label: 'Средняя цена продажи', value: analytics.avg_sell.toFixed(2) },
-        { label: 'Прибыль', value: analytics.avg_profit.toFixed(2) },
+        { label: 'Всего покупок', value: analytics.total_buy_signals },
+        { label: 'Всего продаж', value: analytics.total_sell_signals },
+        { label: 'Всего удержаний', value: analytics.total_hold_signals },
+        { label: 'Средняя цена покупки', value: analytics.avg_buy_price?.toFixed(2) || '0.00' },
+        { label: 'Средняя цена продажи', value: analytics.avg_sell_price?.toFixed(2) || '0.00' },
+        { label: 'Прибыль стратегии', value: analytics.strategy_profit?.toFixed(2) || '0.00' },
+        { label: 'Прибыль по парам', value: analytics.pair_profit?.toFixed(2) || '0.00' },
+        { label: 'Завершенных сделок', value: analytics.completed_trades || 0 },
+        { label: 'Точность предсказаний', value: analytics.prediction_coverage || '0%' },
+        { label: 'Всего свечей', value: analytics.total_candles || 0 },
     ];
 
     return (
